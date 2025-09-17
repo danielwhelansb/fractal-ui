@@ -48,12 +48,9 @@ export const GetMyTokens = async (
 ): Promise<MintWithBalanceResponse> => {
   const feUrl = await getFractalEngineURL();
 
-  const url = new URL(feUrl + "/mint-token-balances");
+  const url = new URL(feUrl + "/token-balances/" + myAddress);
 
-  if (myAddress) {
-    url.searchParams.append("address", myAddress);
-  }
-
+  url.searchParams.append("include_mint_details", "true");
   url.searchParams.append("page", `${page}`);
   url.searchParams.append("limit", `${limit}`);
 
@@ -65,6 +62,7 @@ export const GetMyTokens = async (
     },
   });
 
+ 
   const resJson = await res.json();
   return resJson;
 };
@@ -76,11 +74,8 @@ export const GetMyInvoices = async (
 ): Promise<InvoicesResponse> => {
   const feUrl = await getFractalEngineURL();
 
-  const url = new URL(feUrl + "/my-invoices");
+  const url = new URL(feUrl + "/invoices/" + myAddress);
 
-  if (myAddress) {
-    url.searchParams.append("address", myAddress);
-  }
 
   url.searchParams.append("page", `${page}`);
   url.searchParams.append("limit", `${limit}`);
@@ -395,7 +390,7 @@ const payInvoiceHttp = async (
     invoice_hash: invoiceHash,
   };
 
-  const res = await fetch(feUrl + "/invoices/encoded-transaction-body", {
+  const res = await fetch(feUrl + "/payments/new", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
