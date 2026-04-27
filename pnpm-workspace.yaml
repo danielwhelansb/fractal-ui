@@ -5,3 +5,4 @@ onlyBuiltDependencies:
   - esbuild
   - prisma
   - sharp
+  - "fractal-engine-client-js"

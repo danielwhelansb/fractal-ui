@@ -13,30 +13,38 @@ import km2, {
 } from "@houseofdoge/km2";
 import { GetIndexerUTXOs, UTXOItem } from "./indexer-client";
 import { Mint, MintsResponse } from "@/app/api/mints/route";
-import { URLSearchParams } from "url";
-import { MintWithBalanceResponse } from "./definitions";
+import { Invoice, MintWithBalance, MintWithBalanceResponse } from "./definitions";
 import { InvoicesResponse } from "@/app/api/invoice/my/route";
 import { removeNullKeys } from "./utils";
-
+import { createClient, Transport } from "@connectrpc/connect";
+import { createConnectTransport } from "@connectrpc/connect-web";
+import { FractalEngineRpcService } from "fractal-engine-client-js";
+import { create } from "@bufbuild/protobuf";
+import { parseISO } from 'date-fns';
+ 
 const KOINU = 100_000_000;
 const KOINU_DECIMALS = 8;
 
-export const GetFractalEngineHealth = async (): Promise<Health> => {
-  const feUrl = await getFractalEngineURL();
+const url = await getFractalEngineURL();
+const transport = createConnectTransport({
+  baseUrl: url!,
+});
+const client = createClient(FractalEngineRpcService, transport);
 
+export const GetFractalEngineHealth = async (): Promise<Health> => { 
   try {
-    const result = await fetch(feUrl + "/health");
-    const parsedResult = await result.json();
-
+    const result = await client.getHealth({})
+    const resultObj = JSON.parse(JSON.stringify(result))
+ 
     return {
-      ...parsedResult,
-      fractal_engine_url: feUrl,
+      ...resultObj,
+      fractal_engine_url: url,
       fractal_engine_connected: true,
     } as Health;
   } catch (e) {}
 
   return {
-    fractal_engine_url: feUrl,
+    fractal_engine_url: url,
     fractal_engine_connected: false,
   } as Health;
 };
@@ -44,52 +52,80 @@ export const GetFractalEngineHealth = async (): Promise<Health> => {
 export const GetMyTokens = async (
   page: number,
   limit: number,
-  myAddress: string | null,
+  myAddress: string,
 ): Promise<MintWithBalanceResponse> => {
-  const feUrl = await getFractalEngineURL();
-
-  const url = new URL(feUrl + "/token-balances/" + myAddress);
-
-  url.searchParams.append("include_mint_details", "true");
-  url.searchParams.append("page", `${page}`);
-  url.searchParams.append("limit", `${limit}`);
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
+  const res = await client.getTokenBalances({
+    address: {
+      value: myAddress
     },
-  });
+    includeMintDetails: true,
+    page: page,
+    limit: limit
+  })
+  
+  const tokenBalances = res.mints.map((v) => {
+    const mint = v.mint!;
 
- 
-  const resJson = await res.json();
-  return resJson;
+    const mintWithBalance = {
+        id: mint.id,
+        hash: mint.hash!.value,
+        title: mint.title,
+        fraction_count: mint.fractionCount,
+        metadata: mint.metadata,
+        description: mint.description,
+        transaction_hash: mint.transactionHash!.value,
+        block_height: mint.blockHeight,
+        created_at: parseISO(mint.createdAt),
+        feed_url: mint.feedUrl,
+        owner_address: mint.ownerAddress!.value,
+        address: v.address!.value,
+        quantity: v.quantity,
+    } as MintWithBalance; 
+
+    return mintWithBalance;
+  })
+
+  return {
+    mints: tokenBalances,
+    page: res.page,
+    total: res.total,
+  }
 };
 
 export const GetMyInvoices = async (
   page: number,
   limit: number,
-  myAddress: string | null,
+  myAddress: string,
 ): Promise<InvoicesResponse> => {
-  const feUrl = await getFractalEngineURL();
-
-  const url = new URL(feUrl + "/invoices/" + myAddress);
-
-
-  url.searchParams.append("page", `${page}`);
-  url.searchParams.append("limit", `${limit}`);
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
+  
+  const res = await client.getInvoices({
+    address: {
+      value: myAddress,
     },
-  });
+    page: page,
+    limit: limit
+  })
 
-  const resJson = await res.json();
-  return resJson;
+  const invoiceMappings = res.invoices.map((inv) => {
+    return {
+      id: inv.id,
+      hash: inv.hash?.value,
+      mint_hash: inv.mintHash?.value,
+      quantity: inv.quantity,
+      price: inv.price,
+      buyer_address: inv.buyerAddress?.value,
+      created_at: inv.createdAt,
+      seller_address: inv.sellerAddress?.value,
+      public_key: inv.publicKey,
+    } as Invoice
+  })
+
+  return {
+    invoices: invoiceMappings,
+    limit: res.limit,
+    page: res.page,
+    total: res.total,
+  };
 };
 
 export const GetMyMints = async (
@@ -97,28 +133,33 @@ export const GetMyMints = async (
   limit: number,
   myAddress: string | null,
 ): Promise<MintsResponse> => {
-  const feUrl = await getFractalEngineURL();
-
-  const url = new URL(feUrl + "/mints");
-
-  if (myAddress) {
-    url.searchParams.append("address", myAddress);
-  }
-
-  url.searchParams.append("page", `${page}`);
-  url.searchParams.append("limit", `${limit}`);
-  url.searchParams.append("include_unconfirmed", "true");
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
+  const res = await client.getMints({
+    page: page,
+    limit: limit,
   });
 
-  const resJson = await res.json();
-  return resJson;
+  const mintMappings = res.mints.map((mint) => {
+    return {
+      id: mint.id,
+      hash: mint.hash!.value,
+      title: mint.title,
+      fraction_count: mint.fractionCount,
+      metadata: mint.metadata,
+      description: mint.description,
+      transaction_hash: mint.transactionHash!.value,
+      block_height: mint.blockHeight,
+      created_at: parseISO(mint.createdAt),
+      feed_url: mint.feedUrl,
+      owner_address: mint.ownerAddress!.value,
+    } as Mint;
+  });
+
+  return {
+    mints: mintMappings,
+    page: res.page,
+    total: res.total,
+    limit: res.limit,
+  };
 };
 
 export const CreateInvoice = async (invoiceData: any): Promise<string> => {

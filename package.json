@@ -7,11 +7,15 @@
     "dev": "next dev --turbopack",
     "fix": "biome check --fix",
     "lint": "biome check",
+    "postinstall": "cd node_modules/fractal-engine-client-js && npm install && npm run build && ./node_modules/.bin/tsc --emitDeclarationOnly",
     "seed": "tsx prisma/seed.ts",
     "start": "next start",
     "test": "vitest"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "^2.12.0",
+    "@connectrpc/connect": "^2.1.1",
+    "@connectrpc/connect-web": "^2.1.1",
     "@date-fns/tz": "^1.2.0",
     "@hookform/resolvers": "^5.2.1",
     "@houseofdoge/km2": "0.0.5-beta-signing-trxns",
@@ -27,6 +31,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
+    "fractal-engine-client-js": "github:Fractal-WG/fractal-engine-client-js#add_prepare_for_lib_use",
     "json-canonicalize": "^2.0.0",
     "lucide-react": "^0.525.0",
     "next": "15.3.6",
