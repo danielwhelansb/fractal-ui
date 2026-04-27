@@ -347,42 +347,13 @@ export const MintToken = async (mintData: any): Promise<string> => {
   return trxnId;
 };
 
-const createRawTransactionHex = async (mintHash: any): Promise<string> => {
-  const feUrl = await getFractalEngineURL();
-
-  const res = await fetch(feUrl + "/doge/mint", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(mintHash),
-  });
-
-  const resJson = await res.json();
-
-  return resJson.raw_transaction_hex;
-};
-
 const sendSignedTransaction = async (
   encodedTrxnHex: string,
 ): Promise<string> => {
-  const feUrl = await getFractalEngineURL();
-
-  const res = await fetch(feUrl + "/doge/send", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      encoded_transaction_hex: encodedTrxnHex,
-    }),
+  const res = await client.dogeSend({
+    encodedTransactionHex: encodedTrxnHex,
   });
-
-  const resJson = await res.json();
-
-  return resJson.raw_transaction_hex;
+  return res.transactionId;
 };
 
 const invoiceHttp = async (
@@ -390,59 +361,44 @@ const invoiceHttp = async (
   wallet: Wallet,
   address: string,
 ): Promise<{ encoded_transaction_body: string; hash: string }> => {
-  const feUrl = await getFractalEngineURL();
-
   using kp = wallet.deriveKeypair({ account: 1, change: 0, index: 0 });
 
   invoiceData = removeNullKeys(invoiceData);
 
-  const hashedPayload = sha256Hash(jsonStringifyCanonical(invoiceData));
-
-  const signature = kp.signMessage({
-    message: hashedPayload,
-  });
-
-  let invoiceEnvelope = {
-    payload: invoiceData,
-    signature: signature.toBase64(),
-    public_key: kp.publicKey,
+  const payload = {
+    paymentAddress: { value: invoiceData.payment_address },
+    sellerAddress: { value: invoiceData.seller_address },
+    ...(invoiceData.buyer_address && { buyerAddress: { value: invoiceData.buyer_address } }),
+    ...(invoiceData.mint_hash && { mintHash: { value: invoiceData.mint_hash } }),
+    quantity: invoiceData.quantity ?? 0,
+    price: invoiceData.price ?? 0,
   };
 
-  const res = await fetch(feUrl + "/invoices", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(invoiceEnvelope),
+  const hashedPayload = sha256Hash(jsonStringifyCanonical(payload));
+  const signature = kp.signMessage({ message: hashedPayload });
+
+  const res = await client.createInvoice({
+    payload,
+    publicKey: kp.publicKey,
+    signature: signature.toBase64(),
   });
 
-  const resJson = await res.json();
-
-  return resJson;
+  return {
+    encoded_transaction_body: res.encodedTransactionBody,
+    hash: res.hash!.value,
+  };
 };
 
 const payInvoiceHttp = async (
   invoiceHash: string,
 ): Promise<{ encoded_transaction_body: string }> => {
-  const feUrl = await getFractalEngineURL();
-
-  let invoiceEnvelope = {
-    invoice_hash: invoiceHash,
-  };
-
-  const res = await fetch(feUrl + "/payments/new", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(invoiceEnvelope),
+  const res = await client.createNewPayment({
+    invoiceHash: { value: invoiceHash },
   });
 
-  const resJson = await res.json();
-
-  return resJson;
+  return {
+    encoded_transaction_body: res.values["encoded_transaction_body"],
+  };
 };
 
 const mintTokenHttp = async (
@@ -450,38 +406,40 @@ const mintTokenHttp = async (
   wallet: Wallet,
   address: string,
 ): Promise<{ encoded_transaction_body: string; hash: string }> => {
-  const feUrl = await getFractalEngineURL();
-
   using kp = wallet.deriveKeypair({ account: 1, change: 0, index: 0 });
 
   mintData.owner_address = address;
-
   mintData = removeNullKeys(mintData);
 
-  const hashedPayload = sha256Hash(jsonStringifyCanonical(mintData));
-
-  const signature = kp.signMessage({
-    message: hashedPayload,
-  });
-
-  let mintEnvelope = {
-    payload: mintData,
-    signature: signature.toBase64(),
-    public_key: kp.publicKey,
+  const payload = {
+    ownerAddress: { value: mintData.owner_address },
+    title: mintData.title ?? "",
+    fractionCount: mintData.fraction_count ?? 0,
+    description: mintData.description ?? "",
+    feedUrl: mintData.feed_url ?? "",
+    contractOfSale: mintData.contract_of_sale ?? "",
+    minSignatures: mintData.min_signatures ?? 0,
+    signatureRequirementType: mintData.signature_requirement_type ?? 0,
+    tags: mintData.tags ?? [],
+    assetManagers: mintData.asset_managers ?? [],
+    ...(mintData.metadata && { metadata: { value: mintData.metadata } }),
+    ...(mintData.lockup_options && { lockupOptions: { value: mintData.lockup_options } }),
+    ...(mintData.requirements && { requirements: { value: mintData.requirements } }),
   };
 
-  const res = await fetch(feUrl + "/mints", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(mintEnvelope),
+  const hashedPayload = sha256Hash(jsonStringifyCanonical(payload));
+  const signature = kp.signMessage({ message: hashedPayload });
+
+  const res = await client.createMint({
+    payload,
+    publicKey: kp.publicKey,
+    signature: signature.toBase64(),
   });
 
-  const resJson = await res.json();
-
-  return resJson;
+  return {
+    encoded_transaction_body: res.encodedTransactionBody,
+    hash: res.hash!.value,
+  };
 };
 
 const getWallet = async (
