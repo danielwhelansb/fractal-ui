@@ -41,7 +41,9 @@ export const GetFractalEngineHealth = async (): Promise<Health> => {
       fractal_engine_url: url,
       fractal_engine_connected: true,
     } as Health;
-  } catch (e) {}
+  } catch (e) {
+    console.log("Error: ", e)
+  }
 
   return {
     fractal_engine_url: url,

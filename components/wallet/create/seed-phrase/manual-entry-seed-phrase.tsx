@@ -22,6 +22,7 @@ const defaultValues = Object.fromEntries(
     "",
   ]),
 );
+defaultValues.name = "";
 
 const wordSchema = (index: number) =>
   z.string().nonempty({ error: `Word ${index} is required.` });
@@ -99,6 +100,8 @@ export const ManualEntrySeedPhrase = ({
     reValidateMode: "onChange",
   });
 
+  const walletName = form.watch('name')
+
   const onSubmit = async (
     data: z.infer<typeof ManualEntrySeedPhraseSchema>,
   ) => {
@@ -106,7 +109,7 @@ export const ManualEntrySeedPhrase = ({
       const seedPhrase = Object.values(data);
       const response = await fetch("/api/wallet/create", {
         method: "POST",
-        body: JSON.stringify({ seedPhrase, password }),
+        body: JSON.stringify({ seedPhrase, password, name: walletName }),
       });
       await response.json();
       setWalletCreated(true);
@@ -157,6 +160,14 @@ export const ManualEntrySeedPhrase = ({
         <GridPaper>
           <div className="grid grid-cols-4 grid-flow-col gap-4 grid-rows-6 w-full border-1 rounded-sm border-blue-100 bg-blue-50 z-10 backdrop-blur-xs p-4">
             {inputFields}
+          </div>
+          <div className="grid grid-cols-4 grid-flow-col gap-4 grid-rows-6 w-full border-1 rounded-sm border-blue-100 bg-blue-50 z-10 backdrop-blur-xs p-4">
+            <InputFormField
+              required
+              control={form.control}
+              name="name"
+              label={`Wallet Name`}
+            />
           </div>
         </GridPaper>
 

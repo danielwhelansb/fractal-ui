@@ -1,3 +1,5 @@
+import { GetFractalEngineHealth } from "@/lib/fractal-engine-client";
+import { GetIndexerHealth } from "@/lib/indexer-client";
 import { type NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -13,17 +15,27 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const responseFe = await fetch(`${fractalEngineUrl}/health`);
-    const responseIndexer = await fetch(`${indexerUrl}/health`);
+    const feHealth = await GetFractalEngineHealth();
+    const indexerHealth = await GetIndexerHealth();
 
-    let status = responseFe.status;
-    if (status === 200) {
-      status = responseIndexer.status;
+    if (!feHealth) {
+      return NextResponse.json({
+        status: 500,
+        message: "Failed",
+      });
     }
 
+    if (!indexerHealth) {
+      return NextResponse.json({
+        status: 500,
+        message: "Failed",
+      });
+    }
+
+
     return NextResponse.json({
-      status: status,
-      message: responseFe.statusText,
+      status: 200,
+      message: "Connected",
     });
   } catch (error) {
     console.error(error);

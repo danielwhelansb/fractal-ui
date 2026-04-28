@@ -13,5 +13,5 @@ export const getIndexerURL = async () => {
     where: { key: { equals: "indexer_url" } },
   });
 
-  return rows?.value;
+  return rows?.value!;
 };

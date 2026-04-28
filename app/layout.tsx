@@ -19,6 +19,9 @@ export default async function RootLayout({
   const configData = await prisma.config.findMany();
   const configDataIsValid = validateConfigRows(configData);
 
+  console.log("configDaconfigDatataIsValid", configData)
+  console.log("configDataIsValid", configDataIsValid)
+
   return (
     <html lang="en" className="h-full">
       <body className="antialiased h-full">

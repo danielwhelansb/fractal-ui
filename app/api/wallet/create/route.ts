@@ -13,6 +13,8 @@ export async function POST(request: NextRequest) {
 
     const health = await GetFractalEngineHealth();
 
+    console.log({ seedPhrase, password, name, health })
+
     let network;
     if (health.chain === "regtest") {
       network = Net.Regtest;
@@ -52,6 +54,11 @@ export async function POST(request: NextRequest) {
           active: true,
         },
       });
+    } else {
+      return NextResponse.json(
+        { error: "Invalid Arguments" },
+        { status: 400 },
+      );
     }
 
     return NextResponse.json({ success: true });

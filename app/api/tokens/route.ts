@@ -5,7 +5,7 @@ import { GetMyTokens } from "@/lib/fractal-engine-client";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const address = searchParams.get("address");
+  const address = searchParams.get("address")!;
   // const myTokens = searchParams.get("myTokens");
   const page = Number(searchParams.get("page")) || 0;
 
