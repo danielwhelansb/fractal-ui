@@ -11,9 +11,17 @@ export type InvoicesResponse = {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const address = searchParams.get("address")!;
-  // const myTokens = searchParams.get("myTokens");
+  const address = searchParams.get("address");
   const page = Number(searchParams.get("page")) || 0;
+
+  if (!address || address === "undefined") {
+    return NextResponse.json<InvoicesResponse>({
+      invoices: [],
+      total: 0,
+      page,
+      limit: PAGE_SIZE,
+    });
+  }
 
   try {
     const invoicesResponse = await GetMyInvoices(page, PAGE_SIZE, address);
@@ -21,7 +29,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Database error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch mints." },
+      { error: "Failed to fetch invoices." },
       { status: 500 },
     );
   }

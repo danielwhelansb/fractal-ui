@@ -6,7 +6,6 @@ import { useContext, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import type { MintsResponse } from "@/app/api/mints/route";
-import { InvoiceShareView } from "@/components/invoice/invoice-share";
 import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { FilterableCombobox } from "@/components/ui/forms/filterable-combobox";
@@ -28,9 +27,6 @@ const NewInvoiceSchema = z.object({
 export default function CreateNewInvoice() {
   const { wallet } = useContext(WalletContext);
   const [loading, setLoading] = useState(false);
-  const [createdInvoiceHash, setCreatedInvoiceHash] = useState<string | null>(
-    null,
-  );
   const { password } = useContext(AuthContext);
   const { data: mintsData, isLoading: mintsLoading } =
     useAPI<MintsResponse>("/api/mints?page=0&limit=100");
@@ -72,11 +68,9 @@ export default function CreateNewInvoice() {
           password: password,
         }),
       });
-      const body = (await res.json()) as { invoice_hash?: string };
-      if (!res.ok || !body.invoice_hash) {
+      if (!res.ok) {
         throw new Error("invoice creation failed");
       }
-      setCreatedInvoiceHash(body.invoice_hash);
       form.reset();
     } catch (error) {
       console.error("Error creating invoice:", error);
@@ -87,17 +81,6 @@ export default function CreateNewInvoice() {
 
   const [quantity, pricePer] = form.watch(["quantity", "pricePer"]);
   const total = Number(quantity) * Number(pricePer);
-
-  if (createdInvoiceHash) {
-    return (
-      <GridPaper>
-        <InvoiceShareView
-          invoiceHash={createdInvoiceHash}
-          onDone={() => setCreatedInvoiceHash(null)}
-        />
-      </GridPaper>
-    );
-  }
 
   return (
     <GridPaper>

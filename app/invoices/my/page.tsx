@@ -56,7 +56,7 @@ export default function MyInvoices() {
   const [showBuying, setShowBuying] = useState(true);
   const [showSelling, setShowSelling] = useState(true);
   const { data, isLoading, error } = useAPI<InvoicesResponse>(
-    `/api/invoice/my?address=${wallet?.address}`,
+    wallet?.address ? `/api/invoice/my?address=${wallet.address}` : null,
   );
 
   const filteredInvoices = data?.invoices

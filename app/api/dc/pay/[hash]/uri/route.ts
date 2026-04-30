@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
-import { GetCreateNewPaymentBody, GetMyInvoices } from "@/lib/fractal-engine-client";
+import { GetCreateNewPaymentBody } from "@/lib/fractal-engine-client";
 import prisma from "@/lib/prisma";
 
 export type DCPayURIResponse = {
@@ -24,20 +24,36 @@ const pubKeyHashUrlSafeB64 = (pubHex: string): string => {
   return createHash("sha256").update(pub).digest().subarray(0, 15).toString("base64url");
 };
 
-type EngineEnvelopeSummary = { pubkey: string; total: string };
+type EngineEnvelopeSummary = {
+  pubkey: string;
+  total: string;
+  sellerAddress: string;
+};
 
 const fetchEngineEnvelope = async (
   engineInternalURL: string,
   hash: string,
 ): Promise<EngineEnvelopeSummary> => {
   const res = await fetch(`${engineInternalURL}/dc/payment/${hash}`);
-  if (!res.ok) throw new Error(`engine /dc/payment/${hash}: ${res.status}`);
+  if (!res.ok) {
+    throw Object.assign(new Error(`engine /dc/payment/${hash}: ${res.status}`), {
+      engineStatus: res.status,
+    });
+  }
   const env = await res.json();
   if (typeof env.pubkey !== "string") throw new Error("engine envelope missing pubkey");
   if (typeof env.payload !== "string") throw new Error("engine envelope missing payload");
   const payload = JSON.parse(Buffer.from(env.payload, "base64").toString("utf8"));
   if (typeof payload.total !== "string") throw new Error("envelope payload missing total");
-  return { pubkey: env.pubkey, total: payload.total };
+  const p2pkh = (payload.outputs ?? []).find(
+    (o: { type?: string; address?: string }) =>
+      (o.type ?? "p2pkh") === "p2pkh" && typeof o.address === "string",
+  );
+  return {
+    pubkey: env.pubkey,
+    total: payload.total,
+    sellerAddress: p2pkh?.address ?? "",
+  };
 };
 
 export async function GET(
@@ -70,26 +86,22 @@ export async function GET(
       );
     }
 
-    const wallet = await prisma.wallet.findFirst({ where: { active: true } });
-    if (!wallet) {
-      return NextResponse.json(
-        { error: "no_wallet", message: "no active wallet" },
-        { status: 404 },
-      );
-    }
-
-    const all = await GetMyInvoices(0, 100, wallet.address);
-    const invoice = all.invoices.find((inv) => inv.hash === hash);
-    if (!invoice) {
-      return NextResponse.json(
-        { error: "not_found", message: "invoice not found" },
-        { status: 404 },
-      );
+    let envelope: EngineEnvelopeSummary;
+    try {
+      envelope = await fetchEngineEnvelope(engineInternalURL, hash);
+    } catch (err) {
+      const status = (err as { engineStatus?: number }).engineStatus;
+      if (status === 404) {
+        return NextResponse.json(
+          { error: "not_found", message: "invoice not found in fractal-engine" },
+          { status: 404 },
+        );
+      }
+      throw err;
     }
 
     const opReturnHex = await GetCreateNewPaymentBody(hash);
-    const { pubkey: pubHex, total } = await fetchEngineEnvelope(engineInternalURL, hash);
-    const pubKeyHash = pubKeyHashUrlSafeB64(pubHex);
+    const pubKeyHash = pubKeyHashUrlSafeB64(envelope.pubkey);
 
     const envelopePath = `/dc/payment/${hash}`;
     const envelopeURL = `${engineExternalURL.replace(/\/+$/, "")}${envelopePath}`;
@@ -100,8 +112,8 @@ export async function GET(
       envelope_url: envelopeURL,
       breakdown: {
         invoice_hash: hash,
-        seller_address: invoice.seller_address,
-        total,
+        seller_address: envelope.sellerAddress,
+        total: envelope.total,
         op_return_hex: opReturnHex,
       },
     });
