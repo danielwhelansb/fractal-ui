@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   description: "Administration UI for the Fractal Engine",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function RootLayout({
   children,
 }: Readonly<{

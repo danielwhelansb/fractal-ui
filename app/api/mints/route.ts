@@ -33,9 +33,14 @@ export async function GET(request: NextRequest) {
   const address = searchParams.get("address");
   // const myTokens = searchParams.get("myTokens");
   const page = Number(searchParams.get("page")) || 0;
+  const limitParam = Number(searchParams.get("limit"));
+  const limit =
+    Number.isFinite(limitParam) && limitParam > 0
+      ? Math.min(limitParam, 100)
+      : PAGE_SIZE;
 
   try {
-    const mintsResponse = await GetMyMints(page, PAGE_SIZE, address);
+    const mintsResponse = await GetMyMints(page, limit, address);
     return NextResponse.json<MintsResponse>(mintsResponse);
   } catch (error) {
     console.error("Database error:", error);

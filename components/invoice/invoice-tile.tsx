@@ -1,6 +1,15 @@
 import { format } from "date-fns/format";
-import { CalendarDays, Clock } from "lucide-react";
+import { CalendarDays, Clock, QrCode } from "lucide-react";
 import { InvoiceItem } from "@/components/invoice/invoice-item";
+import { InvoiceShareView } from "@/components/invoice/invoice-share";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import type { Invoice } from "@/lib/definitions";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +50,39 @@ export const InvoiceTile = ({
               <p>{`${format(new Date(invoice.created_at), "h:mm a")}`}</p>
             </div>
           </div>
-          <InvoiceType selling={selling} />
+          <div className="flex flex-row items-center gap-2">
+            {invoice.paid_at ? (
+              <span
+                title={`Paid ${format(new Date(invoice.paid_at), "PPpp")}`}
+                className="px-1 py-0.5 text-xs border-1 rounded-sm self-start select-none font-bold text-shadow-xs border-emerald-700 bg-emerald-100 text-emerald-700"
+              >
+                Paid
+              </span>
+            ) : null}
+            {selling && !invoice.paid_at ? (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs gap-1"
+                  >
+                    <QrCode className="size-3.5" />
+                    Payment details
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogTitle className="sr-only">Payment details</DialogTitle>
+                  <DialogDescription className="sr-only">
+                    DogeConnect payment URI and breakdown for this invoice.
+                  </DialogDescription>
+                  <InvoiceShareView invoiceHash={invoice.hash} />
+                </DialogContent>
+              </Dialog>
+            ) : null}
+            <InvoiceType selling={selling} />
+          </div>
         </div>
         <div className="flex flex-col gap-2 p-2">
           <div className="flex flex-row gap-2 justify-between">
@@ -51,7 +92,7 @@ export const InvoiceTile = ({
               variant="green"
             />
             <InvoiceItem
-              label="Price"
+              label="Price (koinu)"
               value={invoice.price.toLocaleString()}
               variant="green"
             />
