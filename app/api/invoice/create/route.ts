@@ -7,9 +7,7 @@ export async function POST(request: NextRequest) {
 
     const res = await CreateInvoice(newInvoice);
 
-    return NextResponse.json({
-      transaction_hash: res,
-    });
+    return NextResponse.json(res);
   } catch (error) {
     console.error("Error in invoice POST:", error);
     return NextResponse.json(

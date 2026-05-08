@@ -2,18 +2,20 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoaderPinwheel } from "lucide-react";
-import { useContext, useState } from "react";
+import { useContext, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import type { MintsResponse } from "@/app/api/mints/route";
 import { Button } from "@/components/ui/button";
-import { Form } from "@/components/ui/form";
+import { Form, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { FilterableCombobox } from "@/components/ui/forms/filterable-combobox";
 import { InputFormField } from "@/components/ui/forms/input-form-field";
 import { FormPaper } from "@/components/ui/surfaces/FormPaper";
 import { GridPaper } from "@/components/ui/surfaces/GridPaper";
 import { WalletNotConfiguredAlert } from "@/components/wallet/wallet-not-configured-alert";
-import { WalletContext } from "@/context/wallet-context";
-import { HASH_REGEX } from "@/lib/hash-validation";
 import { AuthContext } from "@/context/auth-context";
+import { WalletContext } from "@/context/wallet-context";
+import { useAPI } from "@/hooks/useAPI";
 
 const NewInvoiceSchema = z.object({
   buyerAddress: z.string().nonempty({ error: "Please enter a buyer address." }),
@@ -26,6 +28,16 @@ export default function CreateNewInvoice() {
   const { wallet } = useContext(WalletContext);
   const [loading, setLoading] = useState(false);
   const { password } = useContext(AuthContext);
+  const { data: mintsData, isLoading: mintsLoading } =
+    useAPI<MintsResponse>("/api/mints?page=0&limit=100");
+  const mintOptions = useMemo(
+    () =>
+      (mintsData?.mints ?? []).map((m) => ({
+        label: m.title,
+        value: m.hash,
+      })),
+    [mintsData],
+  );
 
   const form = useForm<
     z.input<typeof NewInvoiceSchema>,
@@ -46,7 +58,7 @@ export default function CreateNewInvoice() {
   const onSubmit = async (data: z.infer<typeof NewInvoiceSchema>) => {
     try {
       setLoading(true);
-      await fetch("/api/invoice/create", {
+      const res = await fetch("/api/invoice/create", {
         method: "POST",
         body: JSON.stringify({
           buyer_address: data.buyerAddress,
@@ -56,6 +68,9 @@ export default function CreateNewInvoice() {
           password: password,
         }),
       });
+      if (!res.ok) {
+        throw new Error("invoice creation failed");
+      }
       form.reset();
     } catch (error) {
       console.error("Error creating invoice:", error);
@@ -84,12 +99,28 @@ export default function CreateNewInvoice() {
               required
               disabled={loading}
             />
-            <InputFormField
+            <FormField
               control={form.control}
               name="mintHash"
-              label="Mint Hash"
-              required
-              disabled={loading}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="mintHash">
+                    <span className="flex gap-1">
+                      Mint
+                      <span className="text-rose-400">*</span>
+                    </span>
+                    <FormMessage />
+                  </FormLabel>
+                  <FilterableCombobox
+                    options={mintOptions}
+                    value={field.value}
+                    setValue={field.onChange}
+                    loading={loading || mintsLoading}
+                    type="mint"
+                    label="Click to select a mint."
+                  />
+                </FormItem>
+              )}
             />
             <InputFormField
               control={form.control}
@@ -102,15 +133,19 @@ export default function CreateNewInvoice() {
             <InputFormField
               control={form.control}
               name="pricePer"
-              label="Price Per"
+              label="Price per fraction (koinu)"
               inputType="number"
               required
               disabled={loading}
             />
+            <p className="text-xs text-zinc-500 -mt-2">
+              Price is in koinu. 1 DOGE = 100,000,000 koinu, so for 1 DOGE per
+              fraction enter <code>100000000</code>.
+            </p>
             <div className="flex flex-row items-center gap-2 justify-end tabular-nums text-sm">
               <div className="flex flex-1 border-0 rounded-sm min-w-40">
                 <div className="bg-zinc-100 px-2 py-1 rounded-l-sm border-1 border-zinc-200 font-semibold text-zinc-600 select-none">
-                  Total
+                  Total (koinu)
                 </div>
                 <div className="w-full bg-zinc-50 px-2 py-1 rounded-r-sm border-1 border-zinc-200 border-l-0 font-mono text-zinc-700">
                   {total <= 0 ? "-" : total.toLocaleString()}

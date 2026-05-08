@@ -12,6 +12,7 @@ export type Invoice = {
   created_at: string;
   seller_address: string;
   public_key: string;
+  paid_at: string | null;
 };
 
 export type MintsResponse = {

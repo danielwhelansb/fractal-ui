@@ -31,24 +31,35 @@ const transport = createConnectTransport({
 });
 const client = createClient(FractalEngineRpcService, transport);
 
-export const GetFractalEngineHealth = async (): Promise<Health> => { 
+export const GetFractalEngineHealth = async (): Promise<Health> => {
   try {
-    const result = await client.getHealth({})
-    const resultObj = JSON.parse(JSON.stringify(result))
- 
+    const result = await client.getHealth({});
     return {
-      ...resultObj,
-      fractal_engine_url: url,
+      current_block_height: Number(result.currentBlockHeight ?? 0),
+      latest_block_height: Number(result.latestBlockHeight ?? 0),
+      chain: result.chain,
+      wallets_enabled: result.walletsEnabled,
+      version: result.version,
+      fractal_engine_url: url!,
       fractal_engine_connected: true,
-    } as Health;
+      indexer_url: "",
+      indexer_connected: false,
+    };
   } catch (e) {
-    console.log("Error: ", e)
+    console.log("Error: ", e);
   }
 
   return {
-    fractal_engine_url: url,
+    current_block_height: 0,
+    latest_block_height: 0,
+    chain: "",
+    wallets_enabled: false,
+    version: "",
+    fractal_engine_url: url!,
     fractal_engine_connected: false,
-  } as Health;
+    indexer_url: "",
+    indexer_connected: false,
+  };
 };
 
 export const GetMyTokens = async (
@@ -119,6 +130,7 @@ export const GetMyInvoices = async (
       created_at: inv.createdAt,
       seller_address: inv.sellerAddress?.value,
       public_key: inv.publicKey,
+      paid_at: inv.paidAt?.valid ? inv.paidAt.time : null,
     } as Invoice
   })
 
@@ -164,7 +176,14 @@ export const GetMyMints = async (
   };
 };
 
-export const CreateInvoice = async (invoiceData: any): Promise<string> => {
+export type CreateInvoiceResult = {
+  transaction_hash: string;
+  invoice_hash: string;
+};
+
+export const CreateInvoice = async (
+  invoiceData: any,
+): Promise<CreateInvoiceResult> => {
   const walletRecord = await prisma.wallet.findFirstOrThrow({
     where: { active: true },
   });
@@ -223,7 +242,16 @@ export const CreateInvoice = async (invoiceData: any): Promise<string> => {
 
   const trxnId = await sendSignedTransaction(signedTrxn.rawHex);
 
-  return trxnId;
+  return { transaction_hash: trxnId, invoice_hash: invoiceResponse.hash };
+};
+
+export const GetCreateNewPaymentBody = async (
+  invoiceHash: string,
+): Promise<string> => {
+  const res = await client.createNewPayment({
+    invoiceHash: { value: invoiceHash },
+  });
+  return res.values["encoded_transaction_body"];
 };
 
 export const PayInvoice = async (invoiceData: any): Promise<string> => {
@@ -376,7 +404,16 @@ const invoiceHttp = async (
     price: invoiceData.price ?? 0,
   };
 
-  const hashedPayload = sha256Hash(jsonStringifyCanonical(payload));
+  const signablePayload = {
+    payment_address: invoiceData.payment_address ?? "",
+    buyer_address: invoiceData.buyer_address ?? "",
+    mint_hash: invoiceData.mint_hash ?? "",
+    quantity: invoiceData.quantity ?? 0,
+    price: invoiceData.price ?? 0,
+    seller_address: invoiceData.seller_address ?? "",
+  };
+
+  const hashedPayload = sha256Hash(jsonStringifyCanonical(signablePayload));
   const signature = kp.signMessage({ message: hashedPayload });
 
   const res = await client.createInvoice({
@@ -429,7 +466,25 @@ const mintTokenHttp = async (
     ...(mintData.requirements && { requirements: { value: mintData.requirements } }),
   };
 
-  const hashedPayload = sha256Hash(jsonStringifyCanonical(payload));
+  const signablePayload: Record<string, unknown> = {
+    title: mintData.title ?? "",
+    fraction_count: mintData.fraction_count ?? 0,
+    description: mintData.description ?? "",
+    owner_address: mintData.owner_address,
+  };
+  const isNonEmptyObj = (v: unknown) =>
+    v != null && typeof v === "object" && !Array.isArray(v) && Object.keys(v).length > 0;
+  if (mintData.tags?.length) signablePayload.tags = mintData.tags;
+  if (isNonEmptyObj(mintData.metadata)) signablePayload.metadata = mintData.metadata;
+  if (isNonEmptyObj(mintData.requirements)) signablePayload.requirements = mintData.requirements;
+  if (isNonEmptyObj(mintData.lockup_options)) signablePayload.lockup_options = mintData.lockup_options;
+  if (mintData.feed_url) signablePayload.feed_url = mintData.feed_url;
+  if (mintData.contract_of_sale) signablePayload.contract_of_sale = mintData.contract_of_sale;
+  if (mintData.signature_requirement_type) signablePayload.signature_requirement_type = mintData.signature_requirement_type;
+  if (mintData.asset_managers?.length) signablePayload.asset_managers = mintData.asset_managers;
+  if (mintData.min_signatures) signablePayload.min_signatures = mintData.min_signatures;
+
+  const hashedPayload = sha256Hash(jsonStringifyCanonical(signablePayload));
   const signature = kp.signMessage({ message: hashedPayload });
 
   const res = await client.createMint({
