@@ -92,7 +92,7 @@ export const InvoiceTile = ({
               variant="green"
             />
             <InvoiceItem
-              label="Price (koinu)"
+              label="Price (DOGE)"
               value={invoice.price.toLocaleString()}
               variant="green"
             />

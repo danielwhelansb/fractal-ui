@@ -133,25 +133,11 @@ export default function CreateNewInvoice() {
             <InputFormField
               control={form.control}
               name="pricePer"
-              label="Price per fraction (koinu)"
+              label="Price per fraction (DOGE)"
               inputType="number"
               required
               disabled={loading}
             />
-            <p className="text-xs text-zinc-500 -mt-2">
-              Price is in koinu. 1 DOGE = 100,000,000 koinu, so for 1 DOGE per
-              fraction enter <code>100000000</code>.
-            </p>
-            <div className="flex flex-row items-center gap-2 justify-end tabular-nums text-sm">
-              <div className="flex flex-1 border-0 rounded-sm min-w-40">
-                <div className="bg-zinc-100 px-2 py-1 rounded-l-sm border-1 border-zinc-200 font-semibold text-zinc-600 select-none">
-                  Total (koinu)
-                </div>
-                <div className="w-full bg-zinc-50 px-2 py-1 rounded-r-sm border-1 border-zinc-200 border-l-0 font-mono text-zinc-700">
-                  {total <= 0 ? "-" : total.toLocaleString()}
-                </div>
-              </div>
-            </div>
             <Button type="submit" variant="creative" disabled={loading}>
               {loading ? (
                 <LoaderPinwheel className="size-4 animate-spin" />

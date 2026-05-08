@@ -5,7 +5,7 @@ export const getFractalEngineURL = async () => {
     where: { key: { equals: "fractal_engine_url" } },
   });
 
-  return rows?.value;
+  return rows?.value!;
 };
 
 export const getIndexerURL = async () => {

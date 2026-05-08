@@ -25,14 +25,20 @@ import { parseISO } from 'date-fns';
 const KOINU = 100_000_000;
 const KOINU_DECIMALS = 8;
 
-const url = await getFractalEngineURL();
-const transport = createConnectTransport({
-  baseUrl: url!,
-});
-const client = createClient(FractalEngineRpcService, transport);
+export const newClient = async ():  Promise<typeof client> => {
+  const url = await getFractalEngineURL();
+  const transport = createConnectTransport({
+    baseUrl: url!,
+  });
+  const client = createClient(FractalEngineRpcService, transport);
+
+  return client;
+}
 
 export const GetFractalEngineHealth = async (): Promise<Health> => {
   try {
+    const client = await newClient();
+    const url = await getFractalEngineURL();
     const result = await client.getHealth({});
     return {
       current_block_height: Number(result.currentBlockHeight ?? 0),
@@ -48,6 +54,8 @@ export const GetFractalEngineHealth = async (): Promise<Health> => {
   } catch (e) {
     console.log("Error: ", e);
   }
+
+  const url = await getFractalEngineURL();
 
   return {
     current_block_height: 0,
@@ -67,6 +75,7 @@ export const GetMyTokens = async (
   limit: number,
   myAddress: string,
 ): Promise<MintWithBalanceResponse> => {
+  const client = await newClient();
   const res = await client.getTokenBalances({
     address: {
       value: myAddress
@@ -110,7 +119,7 @@ export const GetMyInvoices = async (
   limit: number,
   myAddress: string,
 ): Promise<InvoicesResponse> => {
-  
+  const client = await newClient();
   const res = await client.getInvoices({
     address: {
       value: myAddress,
@@ -147,6 +156,7 @@ export const GetMyMints = async (
   limit: number,
   myAddress: string | null,
 ): Promise<MintsResponse> => {
+  const client = await newClient();
   const res = await client.getMints({
     page: page,
     limit: limit,
@@ -248,6 +258,7 @@ export const CreateInvoice = async (
 export const GetCreateNewPaymentBody = async (
   invoiceHash: string,
 ): Promise<string> => {
+  const client = await newClient();
   const res = await client.createNewPayment({
     invoiceHash: { value: invoiceHash },
   });
@@ -265,6 +276,7 @@ export const PayInvoice = async (invoiceData: any): Promise<string> => {
   delete invoiceData.password;
 
   const utxos = await GetIndexerUTXOs(walletRecord.address);
+  console.log(`[PayInvoice] address=${walletRecord.address} utxos=${utxos.length}`, utxos);
 
   if (utxos.length === 0) {
     throw new Error("No UTXOs found");
@@ -277,19 +289,37 @@ export const PayInvoice = async (invoiceData: any): Promise<string> => {
   const unsignedTrxn = new UnsignedTransaction(Crypto.Dogecoin, network);
 
   // NOTE: This is a pretty crude way of figuring out UTXOs and Fees.
-  const totalValue = dogeToKoinu(utxos[0].value);
   const totalFee = dogeToKoinu("0.002");
   const invoiceValue = dogeToKoinu(`${invoiceData.total}`);
+  const required = invoiceValue + totalFee;
+  console.log(`[PayInvoice] invoiceData.total=${invoiceData.total} invoiceValue=${invoiceValue} koinu, totalFee=${totalFee} koinu, required=${required} koinu`);
+
+  let totalValue = 0;
+  const selectedUtxos: UTXOItem[] = [];
+  for (const utxo of utxos) {
+    selectedUtxos.push(utxo);
+    totalValue += dogeToKoinu(utxo.value);
+    if (totalValue >= required) break;
+  }
+  console.log(`[PayInvoice] selectedUtxos=${selectedUtxos.length} totalValue=${totalValue} koinu`);
+
+  if (totalValue < required) {
+    console.error(`[PayInvoice] Insufficient funds: totalValue=${totalValue} < required=${required}`);
+    throw new Error("Insufficient funds to pay invoice");
+  }
 
   const changeValue = totalValue - invoiceValue - totalFee;
+  console.log(`[PayInvoice] changeValue=${changeValue} koinu, invoiceValue=${invoiceValue} koinu, totalFee=${totalFee} koinu`);
 
-  unsignedTrxn.addInput({
-    outputIndex: utxos[0].vout,
-    prevTxId: utxos[0].tx,
-    scriptPubKeyHex: utxos[0].script,
-    value: totalValue,
-    sequence: 0xffffffff,
-  });
+  for (const utxo of selectedUtxos) {
+    unsignedTrxn.addInput({
+      outputIndex: utxo.vout,
+      prevTxId: utxo.tx,
+      scriptPubKeyHex: utxo.script,
+      value: dogeToKoinu(utxo.value),
+      sequence: 0xffffffff,
+    });
+  }
 
   unsignedTrxn.addOutput({
     kind: "payment",
@@ -313,7 +343,9 @@ export const PayInvoice = async (invoiceData: any): Promise<string> => {
     keypairs: [kp],
   });
 
+  console.log(`[PayInvoice] signed tx rawHex length=${signedTrxn.rawHex.length}`);
   const trxnId = await sendSignedTransaction(signedTrxn.rawHex);
+  console.log(`[PayInvoice] broadcast txId=${trxnId}`);
 
   return trxnId;
 };
@@ -380,6 +412,7 @@ export const MintToken = async (mintData: any): Promise<string> => {
 const sendSignedTransaction = async (
   encodedTrxnHex: string,
 ): Promise<string> => {
+  const client = await newClient();
   const res = await client.dogeSend({
     encodedTransactionHex: encodedTrxnHex,
   });
@@ -415,7 +448,7 @@ const invoiceHttp = async (
 
   const hashedPayload = sha256Hash(jsonStringifyCanonical(signablePayload));
   const signature = kp.signMessage({ message: hashedPayload });
-
+  const client = await newClient();  
   const res = await client.createInvoice({
     payload,
     publicKey: kp.publicKey,
@@ -431,6 +464,7 @@ const invoiceHttp = async (
 const payInvoiceHttp = async (
   invoiceHash: string,
 ): Promise<{ encoded_transaction_body: string }> => {
+  const client = await newClient();
   const res = await client.createNewPayment({
     invoiceHash: { value: invoiceHash },
   });
@@ -487,6 +521,7 @@ const mintTokenHttp = async (
   const hashedPayload = sha256Hash(jsonStringifyCanonical(signablePayload));
   const signature = kp.signMessage({ message: hashedPayload });
 
+  const client = await newClient();
   const res = await client.createMint({
     payload,
     publicKey: kp.publicKey,

@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
   try {
     const mintsResponse = await GetMyTokens(page, PAGE_SIZE, address);
 
+    console.log("mintsResponse", mintsResponse)
+
     return NextResponse.json<MintWithBalanceResponse>(mintsResponse);
   } catch (error) {
     console.error("Database error:", error);

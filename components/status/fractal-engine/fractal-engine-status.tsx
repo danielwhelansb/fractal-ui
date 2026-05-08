@@ -38,7 +38,7 @@ export const FractalEngineStatus = ({
             id: "fe-url",
             value: (
               <>
-                Fractal Engine URL <Monospace>{data?.indexer_url}</Monospace>
+                Fractal Engine URL <Monospace>{data?.fractal_engine_url}</Monospace>
               </>
             ),
           },
