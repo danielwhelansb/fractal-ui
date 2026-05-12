@@ -19,11 +19,10 @@ import { removeNullKeys } from "./utils";
 import { createClient, Transport } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { FractalEngineRpcService } from "fractal-engine-client-js";
-import { create } from "@bufbuild/protobuf";
 import { parseISO } from 'date-fns';
  
 const KOINU = 100_000_000;
-const KOINU_DECIMALS = 8;
+const KOINU_DECIMALS = 8; 
 
 export const newClient = async ():  Promise<typeof client> => {
   const url = await getFractalEngineURL();
@@ -35,10 +34,10 @@ export const newClient = async ():  Promise<typeof client> => {
   return client;
 }
 
-export const GetFractalEngineHealth = async (): Promise<Health> => {
+export const GetFractalEngineHealth = async (fallbackUrl?: string): Promise<Health> => {
   try {
     const client = await newClient();
-    const url = await getFractalEngineURL();
+    const url = await getFractalEngineURL(fallbackUrl);
     const result = await client.getHealth({});
     return {
       current_block_height: Number(result.currentBlockHeight ?? 0),
@@ -55,7 +54,7 @@ export const GetFractalEngineHealth = async (): Promise<Health> => {
     console.log("Error: ", e);
   }
 
-  const url = await getFractalEngineURL();
+  const url = await getFractalEngineURL(fallbackUrl);
 
   return {
     current_block_height: 0,
@@ -151,10 +150,9 @@ export const GetMyInvoices = async (
   };
 };
 
-export const GetMyMints = async (
+export const GetMints = async (
   page: number,
   limit: number,
-  myAddress: string | null,
 ): Promise<MintsResponse> => {
   const client = await newClient();
   const res = await client.getMints({

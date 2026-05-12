@@ -51,11 +51,16 @@ export const GetIndexerUTXOs = async (address: string): Promise<UTXOItem[]> => {
   }));
 };
 
-export const GetIndexerHealth = async (): Promise<{
+export const GetIndexerHealth = async (fallbackUrl?: string): Promise<{
   indexer_url: string;
   indexer_connected: boolean;
 }> => {
-  const indexerUrl = await getIndexerURL();
+  const indexerUrl = await getIndexerURL(fallbackUrl);
+
+  if (!indexerUrl) {
+    return { indexer_url: "", indexer_connected: false };
+  }
+
   try {
     const result = await fetch(`${indexerUrl}/health`, {
       headers: { Accept: "application/json" },

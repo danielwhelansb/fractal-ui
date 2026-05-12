@@ -32,8 +32,8 @@ const ManualEntrySeedPhraseSchema = z.object(
     Array.from({ length: 24 }, (_, index) => [
       `word${String(index + 1).padStart(2, "0")}`,
       wordSchema(index + 1),
-    ]),
-  ),
+    ]).concat(["name"]),
+  )
 );
 
 const getValidationComponent = (

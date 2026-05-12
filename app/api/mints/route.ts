@@ -3,7 +3,7 @@ import { PrismaClient } from "@/generated/prisma";
 import { type MintWithBalance, PAGE_SIZE } from "@/lib/definitions";
 import { getRandomInteger } from "@/lib/utils";
 import km2 from "@houseofdoge/km2";
-import { GetMyMints, MintToken } from "@/lib/fractal-engine-client";
+import { GetMints, MintToken } from "@/lib/fractal-engine-client";
 
 const prisma = new PrismaClient();
 
@@ -30,7 +30,7 @@ export type Mint = {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const address = searchParams.get("address");
+ 
   // const myTokens = searchParams.get("myTokens");
   const page = Number(searchParams.get("page")) || 0;
   const limitParam = Number(searchParams.get("limit"));
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       : PAGE_SIZE;
 
   try {
-    const mintsResponse = await GetMyMints(page, limit, address);
+    const mintsResponse = await GetMints(page, limit);
     return NextResponse.json<MintsResponse>(mintsResponse);
   } catch (error) {
     console.error("Database error:", error);
