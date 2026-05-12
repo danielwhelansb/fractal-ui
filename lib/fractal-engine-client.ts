@@ -276,7 +276,6 @@ export const PayInvoice = async (invoiceData: any): Promise<string> => {
   delete invoiceData.password;
 
   const utxos = await GetIndexerUTXOs(walletRecord.address);
-  console.log(`[PayInvoice] address=${walletRecord.address} utxos=${utxos.length}`, utxos);
 
   if (utxos.length === 0) {
     throw new Error("No UTXOs found");
@@ -292,7 +291,6 @@ export const PayInvoice = async (invoiceData: any): Promise<string> => {
   const totalFee = dogeToKoinu("0.002");
   const invoiceValue = dogeToKoinu(`${invoiceData.total}`);
   const required = invoiceValue + totalFee;
-  console.log(`[PayInvoice] invoiceData.total=${invoiceData.total} invoiceValue=${invoiceValue} koinu, totalFee=${totalFee} koinu, required=${required} koinu`);
 
   let totalValue = 0;
   const selectedUtxos: UTXOItem[] = [];
@@ -301,7 +299,6 @@ export const PayInvoice = async (invoiceData: any): Promise<string> => {
     totalValue += dogeToKoinu(utxo.value);
     if (totalValue >= required) break;
   }
-  console.log(`[PayInvoice] selectedUtxos=${selectedUtxos.length} totalValue=${totalValue} koinu`);
 
   if (totalValue < required) {
     console.error(`[PayInvoice] Insufficient funds: totalValue=${totalValue} < required=${required}`);
@@ -309,7 +306,6 @@ export const PayInvoice = async (invoiceData: any): Promise<string> => {
   }
 
   const changeValue = totalValue - invoiceValue - totalFee;
-  console.log(`[PayInvoice] changeValue=${changeValue} koinu, invoiceValue=${invoiceValue} koinu, totalFee=${totalFee} koinu`);
 
   for (const utxo of selectedUtxos) {
     unsignedTrxn.addInput({
@@ -343,10 +339,7 @@ export const PayInvoice = async (invoiceData: any): Promise<string> => {
     keypairs: [kp],
   });
 
-  console.log(`[PayInvoice] signed tx rawHex length=${signedTrxn.rawHex.length}`);
   const trxnId = await sendSignedTransaction(signedTrxn.rawHex);
-  console.log(`[PayInvoice] broadcast txId=${trxnId}`);
-
   return trxnId;
 };
 
